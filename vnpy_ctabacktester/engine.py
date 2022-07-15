@@ -54,6 +54,8 @@ class BacktesterEngine(BaseEngine):
         self.result_df: DataFrame = None
         self.result_statistics: dict = None
 
+        self.result_minute_df: DataFrame = None
+
         # Optimization result
         self.result_values: list = None
 
@@ -150,6 +152,7 @@ class BacktesterEngine(BaseEngine):
     ) -> None:
         """"""
         self.result_df = None
+        self.result_minute_df = None
         self.result_statistics = None
 
         engine: BacktestingEngine = self.backtesting_engine
@@ -191,7 +194,10 @@ class BacktesterEngine(BaseEngine):
             return
 
         self.result_df = engine.calculate_result()
-        self.result_statistics = engine.calculate_statistics(output=True)
+        self.result_minute_df = engine.calculate_minute_result()
+        self.result_statistics = engine.calculate_statistics(df=self.result_minute_df, output=True)
+        # self.result_statistics = engine.calculate_statistics(output=False)
+
 
         # Clear thread object handler.
         self.thread = None
@@ -242,6 +248,10 @@ class BacktesterEngine(BaseEngine):
     def get_result_df(self) -> DataFrame:
         """"""
         return self.result_df
+
+    def get_result_minute_df(self) -> DataFrame:
+        """"""
+        return self.result_minute_df
 
     def get_result_statistics(self) -> dict:
         """"""
@@ -455,6 +465,10 @@ class BacktesterEngine(BaseEngine):
     def get_all_daily_results(self) -> list:
         """"""
         return self.backtesting_engine.get_all_daily_results()
+
+    def get_all_minute_results(self) -> list:
+        """"""
+        return self.backtesting_engine.get_all_minute_results()
 
     def get_history_data(self) -> list:
         """"""

@@ -17,7 +17,7 @@ from vnpy.chart import ChartWidget, CandleItem, VolumeItem
 from vnpy.trader.utility import load_json, save_json
 from vnpy.trader.object import BarData, TradeData, OrderData
 from vnpy.trader.database import DB_TZ
-from vnpy_ctastrategy.backtesting import DailyResult
+from vnpy_ctastrategy.backtesting import DailyResult, MinuteResult
 
 from ..engine import (
     APP_NAME,
@@ -129,8 +129,10 @@ class BacktesterManager(QtWidgets.QWidget):
         self.candle_button.clicked.connect(self.show_candle_chart)
         self.candle_button.setEnabled(False)
 
-        edit_button: QtWidgets.QPushButton = QtWidgets.QPushButton("代码编辑")
-        edit_button.clicked.connect(self.edit_strategy_code)
+        self.minute_button: QtWidgets.QPushButton = QtWidgets.QPushButton("分钟盈亏")
+        self.minute_button.clicked.connect(self.show_minute_results)
+        self.minute_button.setEnabled(False)
+
 
         reload_button: QtWidgets.QPushButton = QtWidgets.QPushButton("策略重载")
         reload_button.clicked.connect(self.reload_strategy_class)
@@ -144,7 +146,7 @@ class BacktesterManager(QtWidgets.QWidget):
             self.trade_button,
             self.daily_button,
             self.candle_button,
-            edit_button,
+            self.minute_button,
             reload_button
         ]:
             button.setFixedHeight(button.sizeHint().height() * 2)
@@ -177,7 +179,7 @@ class BacktesterManager(QtWidgets.QWidget):
         left_vbox.addWidget(optimization_button)
         left_vbox.addWidget(self.result_button)
         left_vbox.addStretch()
-        left_vbox.addWidget(edit_button)
+        left_vbox.addWidget(self.minute_button)
         left_vbox.addWidget(reload_button)
 
         # Result part
@@ -206,6 +208,12 @@ class BacktesterManager(QtWidgets.QWidget):
             self.event_engine,
             "回测每日盈亏",
             DailyResultMonitor
+        )
+        self.minute_dialog: BacktestingResultDialog = BacktestingResultDialog(
+            self.main_engine,
+            self.event_engine,
+            "回测每分钟盈亏",
+            MinuteResultMonitor
         )
 
         # Candle Chart
@@ -291,12 +299,17 @@ class BacktesterManager(QtWidgets.QWidget):
         statistics: dict = self.backtester_engine.get_result_statistics()
         self.statistics_monitor.set_data(statistics)
 
+        """
         df: DataFrame = self.backtester_engine.get_result_df()
+        self.chart.set_data(df)
+        """
+        df: DataFrame = self.backtester_engine.get_result_minute_df()
         self.chart.set_data(df)
 
         self.trade_button.setEnabled(True)
         self.order_button.setEnabled(True)
         self.daily_button.setEnabled(True)
+        self.minute_button.setEnabled(True)
 
         # Tick data can not be displayed using candle chart
         interval: str = self.interval_combo.currentText()
@@ -381,10 +394,12 @@ class BacktesterManager(QtWidgets.QWidget):
             self.order_button.setEnabled(False)
             self.daily_button.setEnabled(False)
             self.candle_button.setEnabled(False)
+            self.minute_button.setEnabled(False)
 
             self.trade_dialog.clear_data()
             self.order_dialog.clear_data()
             self.daily_dialog.clear_data()
+            self.minute_dialog.clear_data()
             self.candle_dialog.clear_data()
 
     def start_optimization(self) -> None:
@@ -490,6 +505,14 @@ class BacktesterManager(QtWidgets.QWidget):
             self.daily_dialog.update_data(results)
 
         self.daily_dialog.exec_()
+
+    def show_minute_results(self) -> None:
+        """"""
+        if not self.minute_dialog.is_updated():
+            results: List[MinuteResult] = self.backtester_engine.get_all_minute_results()
+            self.minute_dialog.update_data(results)
+
+        self.minute_dialog.exec_()
 
     def show_candle_chart(self) -> None:
         """"""
@@ -735,7 +758,8 @@ class BacktesterChart(pg.GraphicsWindow):
         self.nextRow()
 
         self.pnl_plot = self.addPlot(
-            title="每日盈亏",
+            # title="每日盈亏",
+            title="盈亏",
             axisItems={"bottom": DateAxis(self.dates, orientation="bottom")}
         )
         self.nextRow()
@@ -1102,6 +1126,26 @@ class FloatCell(BaseCell):
 class DailyResultMonitor(BaseMonitor):
     """
     Monitor for backtesting daily result.
+    """
+
+    headers: dict = {
+        "date": {"display": "日期", "cell": BaseCell, "update": False},
+        "trade_count": {"display": "成交笔数", "cell": BaseCell, "update": False},
+        "start_pos": {"display": "开盘持仓", "cell": BaseCell, "update": False},
+        "end_pos": {"display": "收盘持仓", "cell": BaseCell, "update": False},
+        "turnover": {"display": "成交额", "cell": FloatCell, "update": False},
+        "commission": {"display": "手续费", "cell": FloatCell, "update": False},
+        "slippage": {"display": "滑点", "cell": FloatCell, "update": False},
+        "trading_pnl": {"display": "交易盈亏", "cell": FloatCell, "update": False},
+        "holding_pnl": {"display": "持仓盈亏", "cell": FloatCell, "update": False},
+        "total_pnl": {"display": "总盈亏", "cell": FloatCell, "update": False},
+        "net_pnl": {"display": "净盈亏", "cell": FloatCell, "update": False},
+    }
+
+
+class MinuteResultMonitor(BaseMonitor):
+    """
+    Monitor for backtesting minute result.
     """
 
     headers: dict = {
