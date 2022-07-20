@@ -133,9 +133,10 @@ class BacktesterManager(QtWidgets.QWidget):
         self.minute_button.clicked.connect(self.show_minute_results)
         self.minute_button.setEnabled(False)
 
-
-        reload_button: QtWidgets.QPushButton = QtWidgets.QPushButton("策略重载")
-        reload_button.clicked.connect(self.reload_strategy_class)
+        backtesting_multy_button: QtWidgets.QPushButton = QtWidgets.QPushButton("多进程回测")
+        backtesting_multy_button.clicked.connect(self.start_backtesting_multy)
+        # reload_button: QtWidgets.QPushButton = QtWidgets.QPushButton("策略重载")
+        # reload_button.clicked.connect(self.reload_strategy_class)
 
         for button in [
             backtesting_button,
@@ -147,7 +148,8 @@ class BacktesterManager(QtWidgets.QWidget):
             self.daily_button,
             self.candle_button,
             self.minute_button,
-            reload_button
+            backtesting_multy_button
+            # reload_button
         ]:
             button.setFixedHeight(button.sizeHint().height() * 2)
 
@@ -180,7 +182,8 @@ class BacktesterManager(QtWidgets.QWidget):
         left_vbox.addWidget(self.result_button)
         left_vbox.addStretch()
         left_vbox.addWidget(self.minute_button)
-        left_vbox.addWidget(reload_button)
+        # left_vbox.addWidget(reload_button)
+        left_vbox.addWidget(backtesting_multy_button)
 
         # Result part
         self.statistics_monitor: StatisticsMonitor = StatisticsMonitor()
@@ -401,6 +404,111 @@ class BacktesterManager(QtWidgets.QWidget):
             self.daily_dialog.clear_data()
             self.minute_dialog.clear_data()
             self.candle_dialog.clear_data()
+
+    def start_backtesting_multy(self) -> None:
+        """"""
+        class_name: str = self.class_combo.currentText()
+        if not class_name:
+            self.write_log("请选择要回测的策略")
+            return
+
+        vt_symbol: str = self.symbol_line.text()
+        interval: str = self.interval_combo.currentText()
+        start: datetime = self.start_date_edit.dateTime().toPython()
+        end: datetime = self.end_date_edit.dateTime().toPython()
+        rate: float = float(self.rate_line.text())
+        slippage: float = float(self.slippage_line.text())
+        size: float = float(self.size_line.text())
+        pricetick: float = float(self.pricetick_line.text())
+        capital: float = float(self.capital_line.text())
+
+        # Check validity of vt_symbol
+        if "." not in vt_symbol:
+            self.write_log("本地代码缺失交易所后缀，请检查")
+            return
+
+        _, exchange_str = vt_symbol.split(".")
+        if exchange_str not in Exchange.__members__:
+            self.write_log("本地代码的交易所后缀不正确，请检查")
+            return
+
+        # Save backtesting parameters
+        backtesting_setting: dict = {
+            "class_name": class_name,
+            "vt_symbol": vt_symbol,
+            "interval": interval,
+            "start": start.strftime("%Y-%m-%d"),
+            "rate": rate,
+            "slippage": slippage,
+            "size": size,
+            "pricetick": pricetick,
+            "capital": capital
+        }
+        save_json(self.setting_filename, backtesting_setting)
+
+        # Get strategy setting
+        old_setting: dict = self.settings[class_name]
+        dialog: BacktestingSettingEditor = BacktestingSettingEditor(class_name, old_setting)
+        i: int = dialog.exec()
+        if i != dialog.Accepted:
+            return
+
+        new_setting: dict = dialog.get_setting()
+
+        optimization_setting = OptimizationSetting()
+        optimization_setting.set_target("total_return")
+        for name, value in new_setting.items():
+            # type_ = type(value)
+            # if type_ not in [int, float]:
+            #     continue
+            optimization_setting.add_parameter(name, value)
+
+        # result: bool = self.backtester_engine.start_backtesting(
+        #     class_name,
+        #     vt_symbol,
+        #     interval,
+        #     start,
+        #     end,
+        #     rate,
+        #     slippage,
+        #     size,
+        #     pricetick,
+        #     capital,
+        #     new_setting
+        # )
+        #
+        # if result:
+        #     self.statistics_monitor.clear_data()
+        #     self.chart.clear_data()
+        #
+        #     self.trade_button.setEnabled(False)
+        #     self.order_button.setEnabled(False)
+        #     self.daily_button.setEnabled(False)
+        #     self.candle_button.setEnabled(False)
+        #     self.minute_button.setEnabled(False)
+        #
+        #     self.trade_dialog.clear_data()
+        #     self.order_dialog.clear_data()
+        #     self.daily_dialog.clear_data()
+        #     self.minute_dialog.clear_data()
+        #     self.candle_dialog.clear_data()
+
+        self.backtester_engine.start_optimization(
+                    class_name,
+                    vt_symbol,
+                    interval,
+                    start,
+                    end,
+                    rate,
+                    slippage,
+                    size,
+                    pricetick,
+                    capital,
+                    optimization_setting,
+                    False
+                )
+
+        self.result_button.setEnabled(False)
 
     def start_optimization(self) -> None:
         """"""

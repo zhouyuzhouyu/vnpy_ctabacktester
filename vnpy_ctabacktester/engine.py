@@ -182,7 +182,8 @@ class BacktesterEngine(BaseEngine):
             setting
         )
 
-        engine.load_data()
+        # engine.load_data()
+        engine.load_data_from_csv()
 
         try:
             engine.run_backtesting()
@@ -286,6 +287,7 @@ class BacktesterEngine(BaseEngine):
 
         engine: BacktestingEngine = self.backtesting_engine
         engine.clear_data()
+        engine.output = self.write_log
 
         if interval == Interval.TICK.value:
             mode: BacktestingMode = BacktestingMode.TICK
