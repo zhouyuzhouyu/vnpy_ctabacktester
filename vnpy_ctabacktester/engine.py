@@ -184,9 +184,9 @@ class BacktesterEngine(BaseEngine):
         )
 
         # engine.load_data()
-        engine.load_data_from_csv()
 
         try:
+            engine.load_data_from_csv()
             engine.run_backtesting()
         except Exception:
             msg: str = f"{tr('The strategy backtest failed and an exception was triggered', '策略回测失败，触发异常')}：\n{traceback.format_exc()}"
