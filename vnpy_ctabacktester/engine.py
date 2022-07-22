@@ -15,7 +15,7 @@ from vnpy.trader.engine import BaseEngine, MainEngine
 from vnpy.trader.constant import Interval
 from vnpy.trader.utility import extract_vt_symbol
 from vnpy.trader.object import HistoryRequest, TickData, ContractData, BarData
-from vnpy.trader.datafeed import BaseDatafeed, get_datafeed
+# from vnpy.trader.datafeed import BaseDatafeed, get_datafeed
 from vnpy.trader.database import BaseDatabase, get_database
 from vnpy.trader.translate import tr
 
@@ -48,7 +48,7 @@ class BacktesterEngine(BaseEngine):
         self.backtesting_engine: BacktestingEngine = None
         self.thread: Thread = None
 
-        self.datafeed: BaseDatafeed = get_datafeed()
+        # self.datafeed: BaseDatafeed = get_datafeed()
         self.database: BaseDatabase = get_database()
 
         # Backtesting reuslt
@@ -71,15 +71,15 @@ class BacktesterEngine(BaseEngine):
         self.load_strategy_class()
         self.write_log(tr("Strategy file is loaded", "策略文件加载完成"))
 
-        self.init_datafeed()
+        # self.init_datafeed()
 
-    def init_datafeed(self) -> None:
-        """
-        Init datafeed client.
-        """
-        result: bool = self.datafeed.init()
-        if result:
-            self.write_log(tr("Datafeed initialization succeeded", "数据服务初始化成功"))
+    # def init_datafeed(self) -> None:
+    #     """
+    #     Init datafeed client.
+    #     """
+    #     result: bool = self.datafeed.init()
+    #     if result:
+    #         self.write_log(tr("Datafeed initialization succeeded", "数据服务初始化成功"))
 
     def write_log(self, msg: str) -> None:
         """"""
@@ -403,7 +403,8 @@ class BacktesterEngine(BaseEngine):
 
         try:
             if interval == "tick":
-                data: List[TickData] = self.datafeed.query_tick_history(req)
+                # data: List[TickData] = self.datafeed.query_tick_history(req)
+                data = None
             else:
                 contract: Optional[ContractData] = self.main_engine.get_contract(vt_symbol)
 
@@ -414,7 +415,8 @@ class BacktesterEngine(BaseEngine):
                     )
                 # Otherwise use RQData to query data
                 else:
-                    data: List[BarData] = self.datafeed.query_bar_history(req)
+                    # data: List[BarData] = self.datafeed.query_bar_history(req)
+                    data = None
 
             if data:
                 if interval == "tick":
