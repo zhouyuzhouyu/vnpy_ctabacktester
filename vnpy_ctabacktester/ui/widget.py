@@ -1052,7 +1052,7 @@ class OptimizationSettingEditor(QtWidgets.QDialog):
             else:
                 grid.addWidget(QLabel(name), row, 0)
                 grid.addWidget(start_edit, row, 1)
-                grid.addWidget(step_edit, row, 2)
+                # grid.addWidget(step_edit, row, 2)
                 grid.addWidget(end_edit, row, 3)
 
 
@@ -1072,6 +1072,7 @@ class OptimizationSettingEditor(QtWidgets.QDialog):
         row += 1
         ga_button: QtWidgets.QPushButton = QtWidgets.QPushButton(tr("Genetic Algorithm Optimization", "遗传算法优化"))
         ga_button.clicked.connect(self.generate_ga_setting)
+        ga_button.setEnabled(False)
         grid.addWidget(ga_button, row, 0, 1, 4)
 
         widget: QtWidgets.QWidget = QtWidgets.QWidget()
