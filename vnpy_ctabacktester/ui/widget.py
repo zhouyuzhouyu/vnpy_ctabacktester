@@ -2,9 +2,10 @@ import csv
 import subprocess
 from datetime import datetime, timedelta
 from copy import copy
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
+import pandas
 import pyqtgraph as pg
 from pandas import DataFrame
 
@@ -14,7 +15,7 @@ from vnpy.trader.ui import QtCore, QtWidgets, QtGui
 from vnpy.trader.ui.widget import BaseMonitor, BaseCell, DirectionCell, EnumCell
 from vnpy.event import Event, EventEngine
 from vnpy.chart import ChartWidget, CandleItem, VolumeItem
-from vnpy.trader.utility import load_json, save_json
+from vnpy.trader.utility import load_json, save_json, combinTickTradesFile, combinTickResultsFile
 from vnpy.trader.object import BarData, TradeData, OrderData
 from vnpy.trader.database import DB_TZ
 from vnpy_ctastrategy.backtesting import DailyResult, MinuteResult
@@ -321,7 +322,27 @@ class BacktesterManager(QtWidgets.QWidget):
             self.candle_button.setEnabled(True)
 
     def process_optimization_finished_event(self, event: Event) -> None:
-        """"""
+        # combin /tick/trade.csv
+        combinTickTradesFile()
+        # combin /tick/results.csv
+        combinTickResultsFile()
+
+        # df: DataFrame = None
+        # results: List[Tuple] = self.backtester_engine.get_result_values()
+        # results.sort(key=lambda result: result[2]["start_date"])
+        # for _, _, _, df_temp in results:
+        #     if df is None:
+        #         df = df_temp
+        #     else:
+        #         df = pandas.concat([df, df_temp], axis=0)
+        #
+        # self.chart.set_data(df)
+
+        # self.trade_button.setEnabled(True)
+        # self.order_button.setEnabled(True)
+        # self.daily_button.setEnabled(True)
+        # self.minute_button.setEnabled(True)
+
         self.write_log(tr("Please click the [Optimization Results] button to view", "请点击[优化结果]按钮查看"))
         self.result_button.setEnabled(True)
 
@@ -1013,20 +1034,27 @@ class OptimizationSettingEditor(QtWidgets.QDialog):
 
         for name, value in self.parameters.items():
             type_ = type(value)
-            if type_ not in [int, float]:
+            if type_ not in [int, float, bool]:
                 continue
 
             start_edit: QtWidgets.QLineEdit = QtWidgets.QLineEdit(str(value))
             step_edit: QtWidgets.QLineEdit = QtWidgets.QLineEdit(str(1))
             end_edit: QtWidgets.QLineEdit = QtWidgets.QLineEdit(str(value))
 
-            for edit in [start_edit, step_edit, end_edit]:
-                edit.setValidator(validator)
+            if type_ in [int, float]:
+                for edit in [start_edit, step_edit, end_edit]:
+                    edit.setValidator(validator)
 
-            grid.addWidget(QLabel(name), row, 0)
-            grid.addWidget(start_edit, row, 1)
-            grid.addWidget(step_edit, row, 2)
-            grid.addWidget(end_edit, row, 3)
+                    grid.addWidget(QLabel(name), row, 0)
+                    grid.addWidget(start_edit, row, 1)
+                    grid.addWidget(step_edit, row, 2)
+                    grid.addWidget(end_edit, row, 3)
+            else:
+                grid.addWidget(QLabel(name), row, 0)
+                grid.addWidget(start_edit, row, 1)
+                grid.addWidget(step_edit, row, 2)
+                grid.addWidget(end_edit, row, 3)
+
 
             self.edits[name] = {
                 "type": type_,
@@ -1077,19 +1105,29 @@ class OptimizationSettingEditor(QtWidgets.QDialog):
 
         for name, d in self.edits.items():
             type_ = d["type"]
-            start_value = type_(d["start"].text())
-            step_value = type_(d["step"].text())
-            end_value = type_(d["end"].text())
+            if type_ is bool:
+                start_value = True if d["start"].text() == "True" else False
+                end_value = True if d["end"].text() == "True" else False
+            else:
+                start_value = type_(d["start"].text())
+                step_value = type_(d["step"].text())
+                end_value = type_(d["end"].text())
 
             if start_value == end_value:
-                self.optimization_setting.add_parameter(name, start_value)
+                if type_ is bool:
+                    self.optimization_setting.params[name] = [start_value]
+                else:
+                    self.optimization_setting.add_parameter(name, start_value)
             else:
-                self.optimization_setting.add_parameter(
-                    name,
-                    start_value,
-                    end_value,
-                    step_value
-                )
+                if type_ is bool:
+                    self.optimization_setting.params[name] = [True, False]
+                else:
+                    self.optimization_setting.add_parameter(
+                        name,
+                        start_value,
+                        end_value,
+                        step_value
+                    )
 
         self.accept()
 
@@ -1135,10 +1173,22 @@ class OptimizationResultMonitor(QtWidgets.QDialog):
             1, QtWidgets.QHeaderView.Stretch
         )
 
+        result_tmp = {}
         for n, tp in enumerate(self.result_values):
-            setting, target_value, _ = tp
-            setting_cell: QtWidgets.QTableWidgetItem = QtWidgets.QTableWidgetItem(str(setting))
-            target_cell: QtWidgets.QTableWidgetItem = QtWidgets.QTableWidgetItem(f"{target_value:.2f}")
+            setting, target_value, _, = tp
+            str_setting = str(setting)
+            target_value_cur_list = result_tmp.get(str_setting, [0.0, 0])
+            target_value_cur_list[0] = target_value_cur_list[0] + target_value
+            target_value_cur_list[1] = target_value_cur_list[1] + 1
+            result_tmp[str_setting] = target_value_cur_list
+
+        list_tmp = list(result_tmp.items())
+        list_tmp.sort(key=lambda i: i[1], reverse=True)
+
+        for n, tp in enumerate(list_tmp):
+            str_setting, target_value_list = tp
+            setting_cell: QtWidgets.QTableWidgetItem = QtWidgets.QTableWidgetItem(str_setting)
+            target_cell: QtWidgets.QTableWidgetItem = QtWidgets.QTableWidgetItem(f"{target_value_list[0]/target_value_list[1]:.2f}")
 
             setting_cell.setTextAlignment(QtCore.Qt.AlignCenter)
             target_cell.setTextAlignment(QtCore.Qt.AlignCenter)
